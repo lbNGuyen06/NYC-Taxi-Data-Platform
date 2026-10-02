@@ -4,7 +4,7 @@
 
 | Thuộc tính | Giá trị |
 | --- | --- |
-| Contract version | `0.1.0` |
+| Contract version | `0.2.0` |
 | Status | Draft — đủ để triển khai bản local đầu tiên; cần đánh giá lại các rule `WARN` sau khi phân tích nhiều tháng |
 | Dataset | NYC TLC Yellow Taxi Trip Records |
 | Processing month | `2025-01` |
@@ -213,7 +213,7 @@ Job phải đánh giá tất cả rules áp dụng. Một record có thể chứ
 | `DQ023` | `total_amount > 1000` | WARN | ACCEPT_WITH_WARNING | Ngưỡng điều tra ban đầu |
 | `DQ024` | Khi mọi component đều non-null, trị tuyệt đối của `total_amount - (fare_amount + extra_amount + mta_tax_amount + tip_amount + tolls_amount + improvement_surcharge_amount + congestion_surcharge_amount + airport_fee_amount + cbd_congestion_fee_amount)` lớn hơn `0.01` | WARN | ACCEPT_WITH_WARNING | Có thể do component/adjustment chưa được mô hình hóa đầy đủ |
 
-Các ngưỡng `200 miles`, `24 giờ`, `$1000` là thresholds phiên bản `0.1.0`, dùng để quan sát chứ không khẳng định dữ liệu sai. Sau khi profile 3–6 tháng phải đánh giá lại và tăng contract version nếu thay đổi.
+Các ngưỡng `200 miles`, `24 giờ`, `$1000` được giới thiệu ở `0.1.0` và tiếp tục áp dụng trong `0.2.0`; chúng dùng để quan sát chứ không khẳng định dữ liệu sai. Sau khi profile 3–6 tháng phải đánh giá lại và tăng contract version nếu thay đổi.
 
 ### 7.3 Dataset-level rules
 
@@ -250,7 +250,10 @@ Mỗi dòng là một accepted Yellow Taxi trip record. Record có `WARN` vẫn 
 | `vendor_id` | `INT` | No | Canonical input |
 | `pickup_at` | `TIMESTAMP` | No | Canonical input |
 | `dropoff_at` | `TIMESTAMP` | No | Canonical input |
+| `pickup_date_key` | `INT` | No | `yyyyMMdd` from `pickup_at`; FK to `dim_date.date_key` |
+| `dropoff_date_key` | `INT` | No | `yyyyMMdd` from `dropoff_at`; FK to `dim_date.date_key` |
 | `pickup_date` | `DATE` | No | Date component of `pickup_at` |
+| `dropoff_date` | `DATE` | No | Date component of `dropoff_at` |
 | `pickup_hour` | `TINYINT` | No | Hour 0–23 from `pickup_at` |
 | `pickup_zone_id` | `INT` | No | Canonical input |
 | `dropoff_zone_id` | `INT` | No | Canonical input |
@@ -259,6 +262,7 @@ Mỗi dòng là một accepted Yellow Taxi trip record. Record có `WARN` vẫn 
 | `duration_minutes` | `DECIMAL(12,2)` | No | (`dropoff_at - pickup_at`) / 60 seconds |
 | `rate_code_id` | `INT` | Yes | Canonical input |
 | `payment_type_id` | `INT` | No | Canonical input |
+| `store_and_fwd_flag` | `STRING` | Yes | Canonical input; `Y`, `N` or null |
 | `fare_amount` | `DECIMAL(12,2)` | No | Canonical input |
 | `extra_amount` | `DECIMAL(12,2)` | No | Canonical input |
 | `mta_tax_amount` | `DECIMAL(12,2)` | No | Canonical input |
@@ -271,7 +275,7 @@ Mỗi dòng là một accepted Yellow Taxi trip record. Record có `WARN` vẫn 
 | `total_amount` | `DECIMAL(12,2)` | No | Canonical input |
 | `warning_rule_ids` | `ARRAY<STRING>` | No | All matching `WARN` rule IDs; empty array nếu không có |
 | `processing_month` | `STRING` | No | Pipeline argument, format `yyyy-MM` |
-| `contract_version` | `STRING` | No | `0.1.0` |
+| `contract_version` | `STRING` | No | Contract version used by the run, currently `0.2.0` |
 | `processed_at` | `TIMESTAMP` | No | Pipeline processing timestamp |
 
 Physical partition proposal: `processing_month`, sau đó `pickup_date`. Quyết định cuối cùng chỉ được chốt sau benchmark file count/size và query patterns.
@@ -296,10 +300,11 @@ Physical partition proposal: `processing_month`, sau đó `pickup_date`. Quyết
 | `year` | `SMALLINT` | No | Calendar year |
 | `quarter` | `TINYINT` | No | 1–4 |
 | `month` | `TINYINT` | No | 1–12 |
+| `month_name` | `STRING` | No | English month name |
 | `day` | `TINYINT` | No | Day of month |
-| `day_of_week` | `TINYINT` | No | Phải ghi rõ convention trong implementation |
+| `day_of_week` | `TINYINT` | No | ISO convention: Monday = 1, ..., Sunday = 7 |
 | `day_name` | `STRING` | No | English day name |
-| `is_weekend` | `BOOLEAN` | No | Saturday/Sunday |
+| `is_weekend` | `BOOLEAN` | No | `true` when `day_of_week IN (6,7)` |
 
 Ngày dùng trong fact phải tìm thấy trong `dim_date`.
 
@@ -390,7 +395,7 @@ raw_count = accepted_count + distinct_quarantined_count
 accepted_count = count(distinct trip_id)
 duration_minutes > 0 for every accepted record
 pickup/dropoff zone of every accepted record exists in dim_zone
-pickup_date of every accepted record exists in dim_date
+pickup_date_key and dropoff_date_key of every accepted record exist in dim_date
 processing_month of every accepted record matches the job month
 ```
 
@@ -421,7 +426,7 @@ Observed extremes cần tiếp tục điều tra:
 
 ## 13. Open decisions for later versions
 
-Các mục dưới đây không chặn local implementation `0.1.0`, nhưng phải được điều tra trước khi gọi pipeline production-ready:
+Các mục dưới đây không chặn local implementation `0.2.0`, nhưng phải được điều tra trước khi gọi pipeline production-ready:
 
 1. Xác minh timezone chính thức của timestamps và chiến lược DST/UTC.
 2. Phân tích negative fare/total theo vendor, payment type và rate code để quyết định tạo fact adjustments riêng hay tiếp tục quarantine.
@@ -434,4 +439,5 @@ Các mục dưới đây không chặn local implementation `0.1.0`, nhưng ph�
 
 | Version | Date | Change |
 | --- | --- | --- |
+| `0.2.0` | 2026-10-02 | Đồng bộ output contract với dimensional model: thêm pickup/dropoff date keys, dropoff date, store-and-forward flag và chốt ISO day-of-week |
 | `0.1.0` | 2026-10-02 | Tạo contract triển khai đầu tiên từ profiling tháng 2025-01 |
