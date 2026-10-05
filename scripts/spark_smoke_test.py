@@ -1,5 +1,6 @@
 import argparse
 from pyspark.sql import SparkSession
+from nyc_taxi_data_platform.readers import read_trips, read_zones
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +23,7 @@ def parse_args() -> argparse.Namespace:
 
 def create_spark_session() -> SparkSession:
     spark = SparkSession.builder.appName(
-        "nyc-taxi-smoke-test").config("spark.sql.session.timeZone", "America/New_York").getOrCreate()
+        "nyc-taxi-smoke-test").config("spark.sql.session.timeZone", "America/New_York").config("spark.sql.timestampType", "TIMESTAMP_NTZ").getOrCreate()
     return spark
 
 
@@ -30,8 +31,9 @@ def main() -> None:
     args = parse_args()
     spark = create_spark_session()
     try:
-        trips = spark.read.parquet(args.trips_path)
-        zones = spark.read.option("header", "true").csv(args.zones_path)
+
+        trips = read_trips(spark, args.trips_path)
+        zones = read_zones(spark, args.zones_path)
         print("\n=== schema của trips ===")
         trips.printSchema()
         print("\n=== schema của zones ===")
