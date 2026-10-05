@@ -18,3 +18,9 @@ nyc-taxi-data-platform = "nyc_taxi_data_platform:main"
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyspark==4.2.0",
+    "pytest>=8,<10",
+]
