@@ -6,6 +6,7 @@ from pyspark.sql.types import (
     StructField,
     StructType,
     TimestampNTZType,
+    DecimalType,
 )
 
 TRIP_REQUIRED_COLUMNS = frozenset({
@@ -63,3 +64,49 @@ ZONE_SOURCE_SCHEMA = StructType([
     StructField("Zone", StringType(), True),
     StructField("service_zone", StringType(), True),
 ])
+
+TRIP_SOURCE_TO_CANONICAL = {
+    "VendorID": "vendor_id",
+    "tpep_pickup_datetime": "pickup_at",
+    "tpep_dropoff_datetime": "dropoff_at",
+    "passenger_count": "passenger_count",
+    "trip_distance": "trip_distance_miles",
+    "RatecodeID": "rate_code_id",
+    "store_and_fwd_flag": "store_and_fwd_flag",
+    "PULocationID": "pickup_zone_id",
+    "DOLocationID": "dropoff_zone_id",
+    "payment_type": "payment_type_id",
+    "fare_amount": "fare_amount",
+    "extra": "extra_amount",
+    "mta_tax": "mta_tax_amount",
+    "tip_amount": "tip_amount",
+    "tolls_amount": "tolls_amount",
+    "improvement_surcharge": "improvement_surcharge_amount",
+    "total_amount": "total_amount",
+    "congestion_surcharge": "congestion_surcharge_amount",
+    "Airport_fee": "airport_fee_amount",
+    "cbd_congestion_fee": "cbd_congestion_fee_amount",
+}
+
+TRIP_CANONICAL_TYPES = {
+    "vendor_id": IntegerType(),
+    "pickup_at": TimestampNTZType(),
+    "dropoff_at": TimestampNTZType(),
+    "passenger_count": IntegerType(),
+    "trip_distance_miles": DecimalType(12, 2),
+    "rate_code_id": IntegerType(),
+    "store_and_fwd_flag": StringType(),
+    "pickup_zone_id": IntegerType(),
+    "dropoff_zone_id": IntegerType(),
+    "payment_type_id": IntegerType(),
+    "fare_amount": DecimalType(12, 2),
+    "extra_amount": DecimalType(12, 2),
+    "mta_tax_amount": DecimalType(12, 2),
+    "tip_amount": DecimalType(12, 2),
+    "tolls_amount": DecimalType(12, 2),
+    "improvement_surcharge_amount": DecimalType(12, 2),
+    "total_amount": DecimalType(12, 2),
+    "congestion_surcharge_amount": DecimalType(12, 2),
+    "airport_fee_amount": DecimalType(12, 2),
+    "cbd_congestion_fee_amount": DecimalType(12, 2),
+}

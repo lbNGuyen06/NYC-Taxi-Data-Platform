@@ -13,22 +13,6 @@ from nyc_taxi_data_platform.schemas import TRIP_EXPECTED_TYPES
 from nyc_taxi_data_platform.validators import validate_trips_schema
 
 
-@pytest.fixture(scope="session")
-def spark():
-    spark_session = (
-        SparkSession
-        .builder
-        .master("local[1]")
-        .appName("test-trip-schema-validator")
-        .config("spark.sql.session.timezone", "America/New_York")
-        .config("spark.sql.timestampType", "TIMESTAMP_NTZ")
-        .getOrCreate()
-    )
-    yield spark_session
-
-    spark_session.stop()
-
-
 def build_trip_schema(
     excluded_columns: set[str] | None = None,
     type_overrides: dict[str, DataType] | None = None,
