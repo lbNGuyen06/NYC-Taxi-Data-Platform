@@ -1,6 +1,7 @@
 import argparse
 from pyspark.sql import SparkSession
 from nyc_taxi_data_platform.readers import read_trips, read_zones
+from nyc_taxi_data_platform.validators import validate_trips_schema
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,8 +32,10 @@ def main() -> None:
     args = parse_args()
     spark = create_spark_session()
     try:
-
+        print(
+            f"=== Đường dẫn đến file Yellow Taxi Parquet: {args.trips_path} ===")
         trips = read_trips(spark, args.trips_path)
+        validate_trips_schema(trips)
         zones = read_zones(spark, args.zones_path)
         print("\n=== schema của trips ===")
         trips.printSchema()
