@@ -212,6 +212,7 @@ Job phải đánh giá tất cả rules áp dụng. Một record có thể chứ
 | `DQ022` | Duration > 24 giờ | WARN | ACCEPT_WITH_WARNING | Ngưỡng điều tra ban đầu |
 | `DQ023` | `total_amount > 1000` | WARN | ACCEPT_WITH_WARNING | Ngưỡng điều tra ban đầu |
 | `DQ024` | Khi mọi component đều non-null, trị tuyệt đối của `total_amount - (fare_amount + extra_amount + mta_tax_amount + tip_amount + tolls_amount + improvement_surcharge_amount + congestion_surcharge_amount + airport_fee_amount + cbd_congestion_fee_amount)` lớn hơn `0.01` | WARN | ACCEPT_WITH_WARNING | Có thể do component/adjustment chưa được mô hình hóa đầy đủ |
+| `DQ025` | Required canonical field chưa có rule null riêng bị null hoặc cast lỗi: `vendor_id`, `trip_distance_miles`, `payment_type_id`, `fare_amount`, `extra_amount`, `mta_tax_amount`, `tip_amount`, `tolls_amount`, `improvement_surcharge_amount`, `total_amount` | ERROR | QUARANTINE | Ngăn accepted fact vi phạm non-null contract |
 
 Các ngưỡng `200 miles`, `24 giờ`, `$1000` được giới thiệu ở `0.1.0` và tiếp tục áp dụng trong `0.2.0`; chúng dùng để quan sát chứ không khẳng định dữ liệu sai. Sau khi profile 3–6 tháng phải đánh giá lại và tăng contract version nếu thay đổi.
 
