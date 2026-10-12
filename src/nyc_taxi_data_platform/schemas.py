@@ -87,6 +87,12 @@ TRIP_SOURCE_TO_CANONICAL = {
     "Airport_fee": "airport_fee_amount",
     "cbd_congestion_fee": "cbd_congestion_fee_amount",
 }
+ZONE_SOURCE_TO_CANONICAL = {
+    "LocationID": "zone_id",
+    "Borough": "borough",
+    "Zone": "zone_name",
+    "service_zone": "service_zone",
+}
 
 TRIP_CANONICAL_TYPES = {
     "vendor_id": IntegerType(),
@@ -109,4 +115,11 @@ TRIP_CANONICAL_TYPES = {
     "congestion_surcharge_amount": DecimalType(12, 2),
     "airport_fee_amount": DecimalType(12, 2),
     "cbd_congestion_fee_amount": DecimalType(12, 2),
+}
+
+ZONE_CANONICAL_TYPES = {
+    "zone_id": IntegerType(),
+    "borough": StringType(),
+    "zone_name": StringType(),
+    "service_zone": StringType(),
 }

@@ -6,6 +6,8 @@ from nyc_taxi_data_platform.schemas import (
     TRIP_EXPECTED_TYPES,
     TRIP_OPTIONAL_COLUMNS,
     TRIP_SOURCE_TO_CANONICAL,
+    ZONE_SOURCE_TO_CANONICAL,
+    ZONE_CANONICAL_TYPES,
 )
 from nyc_taxi_data_platform.validators import (
     validate_trips_schema,
@@ -76,5 +78,36 @@ def canonicalize_trips(
 
     return source_df.select(
         source_record,
+        *canonical_columns,
+    )
+
+
+def _build_canonical_zone_column(
+    source_name: str,
+    canonical_name: str,
+) -> Column:
+    expression = F.col(f"`{source_name}`")
+
+    if source_name != "LocationID":
+        expression = F.trim(expression)
+
+    return expression.try_cast(
+        ZONE_CANONICAL_TYPES[canonical_name]
+    ).alias(canonical_name)
+
+
+def canonicalize_zones(
+    zones_df: DataFrame,
+) -> DataFrame:
+    canonical_columns = [
+        _build_canonical_zone_column(
+            source_name,
+            canonical_name,
+        )
+        for source_name, canonical_name
+        in ZONE_SOURCE_TO_CANONICAL.items()
+    ]
+
+    return zones_df.select(
         *canonical_columns,
     )
