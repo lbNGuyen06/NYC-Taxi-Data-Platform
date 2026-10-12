@@ -1,6 +1,7 @@
 import logging
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 from nyc_taxi_data_platform.schemas import (
     TRIP_EXPECTED_TYPES,
@@ -54,4 +55,31 @@ def validate_trips_schema(trips_df: DataFrame) -> None:
     if type_mismatches:
         raise TypeError(
             f"Trip column type mismatches: {type_mismatches}"
+        )
+
+
+def validate_dim_zones(zones_df: DataFrame) -> None:
+    if "zone_id" not in zones_df.columns:
+        raise ValueError(
+            "DS004: dim_zone must include zone_id"
+        )
+
+    summary = zones_df.agg(
+        F.count("*").alias("row_count"),
+        F.count_distinct("zone_id").alias(
+            "distinct_zone_id_count"
+        ),
+    ).first()
+
+    if summary.row_count == 0:
+        raise ValueError(
+            "DS004: dim_zone must not be empty"
+        )
+
+    if (
+        summary.row_count
+        != summary.distinct_zone_id_count
+    ):
+        raise ValueError(
+            "DS004: zone_id must be non-null and unique"
         )
