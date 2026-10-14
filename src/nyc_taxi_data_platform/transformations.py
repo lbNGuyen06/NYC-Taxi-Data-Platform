@@ -16,6 +16,18 @@ from nyc_taxi_data_platform.validators import (
 
 SOURCE_RECORD_COLUMN = "_source_record"
 
+SOURCE_RECORD_ID_COLUMN = "source_record_id"
+
+SOURCE_RECORD_JSON_OPTIONS = {
+    "ignoreNullFields": "false",
+    "timestampFormat": (
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+    ),
+    "timestampNTZFormat": (
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+    ),
+}
+
 
 def _add_missing_optional_columns(
     trips_df: DataFrame,
@@ -110,4 +122,22 @@ def canonicalize_zones(
 
     return zones_df.select(
         *canonical_columns,
+    )
+
+
+def add_source_record_id(
+    trips_df: DataFrame,
+) -> DataFrame:
+    if SOURCE_RECORD_COLUMN not in trips_df.columns:
+        raise ValueError(
+            "Cannot create source_record_id: "
+            "_source_record is missing"
+        )
+    source_record_json = F.to_json(
+        F.col(SOURCE_RECORD_COLUMN),
+        options=SOURCE_RECORD_JSON_OPTIONS,
+    )
+    return trips_df.withColumn(
+        SOURCE_RECORD_ID_COLUMN,
+        F.sha2(source_record_json, 256),
     )

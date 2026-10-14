@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
+import re
 
+import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructField, StructType
 
@@ -12,6 +14,8 @@ from nyc_taxi_data_platform.schemas import (
 from nyc_taxi_data_platform.transformations import (
     SOURCE_RECORD_COLUMN,
     canonicalize_trips,
+    SOURCE_RECORD_ID_COLUMN,
+    add_source_record_id,
 )
 
 
@@ -189,3 +193,144 @@ def test_canonicalization_preserves_record_count(
     result_df = canonicalize_trips(source_df)
 
     assert result_df.count() == source_df.count()
+
+
+def canonicalize_and_add_id(
+    spark: SparkSession,
+    records: list[dict],
+):
+    source_df = spark.createDataFrame(
+        records,
+        build_source_schema(),
+    )
+
+    return add_source_record_id(
+        canonicalize_trips(source_df)
+    )
+
+
+def test_identical_source_records_have_same_id(
+    spark: SparkSession,
+) -> None:
+    first = valid_source_record()
+    second = valid_source_record()
+
+    result_df = canonicalize_and_add_id(
+        spark,
+        [first, second],
+    )
+    source_record_ids = [
+        row[SOURCE_RECORD_ID_COLUMN]
+        for row in result_df.select(
+            SOURCE_RECORD_ID_COLUMN
+        ).collect()
+    ]
+
+    assert source_record_ids[0] == source_record_ids[1]
+
+
+def test_source_value_change_changes_id(
+    spark: SparkSession,
+) -> None:
+    first = valid_source_record()
+    second = valid_source_record()
+    second["tip_amount"] = 3.0
+
+    result_df = canonicalize_and_add_id(
+        spark,
+        [first, second],
+    )
+    source_record_ids = {
+        row[SOURCE_RECORD_ID_COLUMN]
+        for row in result_df.select(
+            SOURCE_RECORD_ID_COLUMN
+        ).collect()
+    }
+
+    assert len(source_record_ids) == 2
+
+
+def test_null_and_zero_create_different_ids(
+    spark: SparkSession,
+) -> None:
+    first = valid_source_record()
+    second = valid_source_record()
+    first["Airport_fee"] = None
+    second["Airport_fee"] = 0.0
+
+    result_df = canonicalize_and_add_id(
+        spark,
+        [first, second],
+    )
+    source_record_ids = {
+        row[SOURCE_RECORD_ID_COLUMN]
+        for row in result_df.select(
+            SOURCE_RECORD_ID_COLUMN
+        ).collect()
+    }
+
+    assert len(source_record_ids) == 2
+
+
+def test_source_record_id_has_sha256_shape(
+    spark: SparkSession,
+) -> None:
+    result = canonicalize_and_add_id(
+        spark,
+        [valid_source_record()],
+    ).first()
+
+    source_record_id = result[
+        SOURCE_RECORD_ID_COLUMN
+    ]
+
+    assert re.fullmatch(
+        r"[0-9a-f]{64}",
+        source_record_id,
+    )
+
+
+def test_source_record_id_matches_contract_fixture(
+    spark: SparkSession,
+) -> None:
+    result = canonicalize_and_add_id(
+        spark,
+        [valid_source_record()],
+    ).first()
+
+    assert result[SOURCE_RECORD_ID_COLUMN] == (
+        "76031473df941525cf6986348ca6e10a"
+        "7f23d4b0a9b70ce202313019ab8d8de6"
+    )
+
+
+def test_add_source_record_id_preserves_record_count(
+    spark: SparkSession,
+) -> None:
+    first = valid_source_record()
+    second = valid_source_record()
+    second["VendorID"] = 2
+
+    source_df = spark.createDataFrame(
+        [first, second],
+        build_source_schema(),
+    )
+    canonical_df = canonicalize_trips(source_df)
+    result_df = add_source_record_id(canonical_df)
+
+    assert result_df.count() == source_df.count()
+
+
+def test_add_source_record_id_requires_source_record(
+    spark: SparkSession,
+) -> None:
+    source_df = spark.createDataFrame(
+        [valid_source_record()],
+        build_source_schema(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="_source_record",
+    ):
+        add_source_record_id(source_df)
