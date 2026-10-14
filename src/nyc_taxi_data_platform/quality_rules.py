@@ -6,8 +6,7 @@ from operator import add, and_, or_
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
-
-
+from pyspark.sql import Window
 Rule = tuple[str, Column]
 
 TEMPORAL_ERROR_RULE_IDS_COLUMN = (
@@ -52,6 +51,9 @@ TOTAL_COMPONENT_COLUMNS = (
 
 ZONE_REFERENCE_ERROR_RULE_IDS_COLUMN = (
     "_zone_reference_error_rule_ids"
+)
+DUPLICATE_ERROR_RULE_IDS_COLUMN = (
+    "_duplicate_error_rule_ids"
 )
 
 
@@ -411,3 +413,35 @@ def apply_zone_reference_quality_rules(
         "_matched_pickup_zone_id",
         "_matched_dropoff_zone_id",
     )
+
+
+def apply_duplicate_quality_rule(
+    trips_df: DataFrame,
+) -> DataFrame:
+    if "source_record_id" not in trips_df.columns:
+        raise ValueError(
+            "Cannot apply DQ013: "
+            "source_record_id is missing"
+        )
+
+    duplicate_window = Window.partitionBy(
+        "source_record_id"
+    ).orderBy(F.lit(1))
+
+    result_df = trips_df.withColumn(
+        "_source_record_rank",
+        F.row_number().over(duplicate_window),
+    )
+
+    duplicate_quality_rule = [
+        (
+            "DQ013",
+            F.col("_source_record_rank") > 1,
+        )
+    ]
+    result_df = result_df.withColumn(
+        DUPLICATE_ERROR_RULE_IDS_COLUMN,
+        _matching_rule_ids(duplicate_quality_rule),
+    )
+
+    return result_df.drop("_source_record_rank")
