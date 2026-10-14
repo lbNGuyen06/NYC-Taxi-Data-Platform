@@ -50,6 +50,10 @@ TOTAL_COMPONENT_COLUMNS = (
     "cbd_congestion_fee_amount",
 )
 
+ZONE_REFERENCE_ERROR_RULE_IDS_COLUMN = (
+    "_zone_reference_error_rule_ids"
+)
+
 
 def _matching_rule_ids(
     rules: Sequence[Rule],
@@ -345,4 +349,65 @@ def apply_warning_quality_rules(
     return trips_df.withColumn(
         WARNING_RULE_IDS_COLUMN,
         _matching_rule_ids(warning_rules),
+    )
+
+
+def apply_zone_reference_quality_rules(
+    trips_df: DataFrame,
+    zones_df: DataFrame,
+) -> DataFrame:
+    pickup_zones_df = F.broadcast(
+        zones_df.select(
+            F.col("zone_id").alias(
+                "_matched_pickup_zone_id"
+            )
+        )
+    )
+
+    dropoff_zones_df = F.broadcast(
+        zones_df.select(
+            F.col("zone_id").alias(
+                "_matched_dropoff_zone_id"
+            )
+        )
+    )
+    result_df = (
+        trips_df
+        .join(
+            pickup_zones_df,
+            F.col("pickup_zone_id")
+            == F.col("_matched_pickup_zone_id"),
+            "left",
+        )
+        .join(
+            dropoff_zones_df,
+            F.col("dropoff_zone_id")
+            == F.col("_matched_dropoff_zone_id"),
+            "left",
+        )
+    )
+    zone_reference_rules = [
+        (
+            "DQ011",
+            F.col("pickup_zone_id").isNotNull()
+            & F.col(
+                "_matched_pickup_zone_id"
+            ).isNull(),
+        ),
+        (
+            "DQ012",
+            F.col("dropoff_zone_id").isNotNull()
+            & F.col(
+                "_matched_dropoff_zone_id"
+            ).isNull(),
+        ),
+    ]
+
+    result_df = result_df.withColumn(
+        ZONE_REFERENCE_ERROR_RULE_IDS_COLUMN,
+        _matching_rule_ids(zone_reference_rules),
+    )
+    return result_df.drop(
+        "_matched_pickup_zone_id",
+        "_matched_dropoff_zone_id",
     )
