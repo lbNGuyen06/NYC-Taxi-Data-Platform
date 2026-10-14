@@ -56,6 +56,15 @@ DUPLICATE_ERROR_RULE_IDS_COLUMN = (
     "_duplicate_error_rule_ids"
 )
 
+ERROR_RULE_IDS_COLUMN = "error_rule_ids"
+
+INTERNAL_ERROR_RULE_IDS_COLUMNS = (
+    TEMPORAL_ERROR_RULE_IDS_COLUMN,
+    SCALAR_ERROR_RULE_IDS_COLUMN,
+    ZONE_REFERENCE_ERROR_RULE_IDS_COLUMN,
+    DUPLICATE_ERROR_RULE_IDS_COLUMN,
+)
+
 
 def _matching_rule_ids(
     rules: Sequence[Rule],
@@ -445,3 +454,53 @@ def apply_duplicate_quality_rule(
     )
 
     return result_df.drop("_source_record_rank")
+
+
+def finalize_quality_rule_ids(
+    trips_df: DataFrame,
+) -> DataFrame:
+    required_columns = {
+        *INTERNAL_ERROR_RULE_IDS_COLUMNS,
+        WARNING_RULE_IDS_COLUMN,
+    }
+    missing_columns = (
+        required_columns - set(trips_df.columns)
+    )
+
+    if missing_columns:
+        raise ValueError(
+            "Cannot finalize quality rule IDs; "
+            "missing columns: "
+            f"{sorted(missing_columns)}"
+        )
+
+    combined_error_rule_ids = F.array_sort(
+        F.array_distinct(
+            F.flatten(
+                F.array(
+                    *[
+                        F.col(column_name)
+                        for column_name
+                        in INTERNAL_ERROR_RULE_IDS_COLUMNS
+                    ]
+                )
+            )
+        )
+    )
+
+    return (
+        trips_df
+        .withColumn(
+            ERROR_RULE_IDS_COLUMN,
+            combined_error_rule_ids,
+        )
+        .withColumn(
+            WARNING_RULE_IDS_COLUMN,
+            F.array_sort(
+                F.array_distinct(
+                    F.col(WARNING_RULE_IDS_COLUMN)
+                )
+            ),
+        )
+        .drop(*INTERNAL_ERROR_RULE_IDS_COLUMNS)
+    )
